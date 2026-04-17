@@ -1,97 +1,88 @@
-import threading
-import queue
-import time
+import asyncio
 
 from modules.spectrum.spectrum_engine import SpectrumEngine
 from modules.duka.duka_core import DukaCore
 from modules.viola.viola_core import ViolaCore
 
 
-class UnifiedCore:
+class UnifiedAsyncCore:
     def __init__(self):
         self.spectrum = SpectrumEngine()
         self.duka = DukaCore()
         self.viola = ViolaCore()
 
-        self.input_queue = queue.Queue()
-        self.decision_queue = queue.Queue()
-        self.output_queue = queue.Queue()
+        self.input_queue = asyncio.Queue()
+        self.decision_queue = asyncio.Queue()
+        self.output_queue = asyncio.Queue()
 
         self.running = True
 
     # ==========================
-    # Spectrum Thread
+    # Spectrum
     # ==========================
-    def spectrum_listener(self):
+    async def spectrum_listener(self):
         while self.running:
-            data = self.spectrum.listen()
+            data = await self.spectrum.listen()
 
             if data:
-                self.input_queue.put(data)
+                await self.input_queue.put(data)
 
-            time.sleep(0.05)
+            await asyncio.sleep(0.01)
 
     # ==========================
-    # Duka Thread
+    # Duka
     # ==========================
-    def duka_processor(self):
+    async def duka_processor(self):
         while self.running:
-            if not self.input_queue.empty():
-                data = self.input_queue.get()
-                decision = self.duka.process(data)
-                self.decision_queue.put(decision)
-
-            time.sleep(0.05)
+            data = await self.input_queue.get()
+            decision = await self.duka.process(data)
+            await self.decision_queue.put(decision)
 
     # ==========================
-    # Viola Thread
+    # Viola
     # ==========================
-    def viola_optimizer(self):
+    async def viola_optimizer(self):
         while self.running:
-            if not self.decision_queue.empty():
-                decision = self.decision_queue.get()
-                response = self.viola.resonate(decision)
-                self.output_queue.put(response)
-
-            time.sleep(0.05)
+            decision = await self.decision_queue.get()
+            response = await self.viola.resonate(decision)
+            await self.output_queue.put(response)
 
     # ==========================
-    # Execution Thread
+    # Output
     # ==========================
-    def output_executor(self):
+    async def output_executor(self):
         while self.running:
-            if not self.output_queue.empty():
-                response = self.output_queue.get()
-                self.spectrum.transmit(response)
-
-            time.sleep(0.05)
+            response = await self.output_queue.get()
+            await self.spectrum.transmit(response)
 
     # ==========================
-    # Start all threads
+    # Monitor
     # ==========================
-    def start(self):
-        threads = [
-            threading.Thread(target=self.spectrum_listener),
-            threading.Thread(target=self.duka_processor),
-            threading.Thread(target=self.viola_optimizer),
-            threading.Thread(target=self.output_executor)
+    async def monitor(self):
+        while self.running:
+            print(f"[Monitor] Input={self.input_queue.qsize()} "
+                  f"Decision={self.decision_queue.qsize()} "
+                  f"Output={self.output_queue.qsize()}")
+
+            await asyncio.sleep(5)
+
+    # ==========================
+    # Start
+    # ==========================
+    async def start(self):
+        tasks = [
+            asyncio.create_task(self.spectrum_listener()),
+            asyncio.create_task(self.duka_processor()),
+            asyncio.create_task(self.viola_optimizer()),
+            asyncio.create_task(self.output_executor()),
+            asyncio.create_task(self.monitor())
         ]
 
-        for t in threads:
-            t.daemon = True
-            t.start()
+        print("[SYSTEM] Async autonomous core started.")
 
-        print("[SYSTEM] Parallel autonomous core started.")
-
-        try:
-            while True:
-                time.sleep(1)
-
-        except KeyboardInterrupt:
-            self.running = False
-            print("[SYSTEM] Shutdown complete.")
+        await asyncio.gather(*tasks)
 
 
 if __name__ == "__main__":
-    core = UnifiedCore()
-    core.start()
+    core = UnifiedAsyncCore()
+    asyncio.run(core.start())
