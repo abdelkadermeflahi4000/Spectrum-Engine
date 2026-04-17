@@ -1,0 +1,6 @@
+def monitor(self):
+    while self.running:
+        print("Input:", self.input_queue.qsize())
+        print("Decision:", self.decision_queue.qsize())
+        print("Output:", self.output_queue.qsize())
+        time.sleep(5)
