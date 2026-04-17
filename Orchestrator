@@ -1,0 +1,11 @@
+class Orchestrator:
+    def __init__(self):
+        self.spectrum = SpectrumModule()
+        self.duka = DukaModule()
+        self.viola = ViolaModule()
+
+    def run(self):
+        data = self.spectrum.listen()
+        thought = self.duka.process(data)
+        response = self.viola.resonate(thought)
+        self.spectrum.transmit(response)
